@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kite-x402-fastapi"
+version = "0.1.0"
+description = "Minimal FastAPI reverse proxy for x402 payments on Kite"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "httpx>=0.28.1,<0.29",
+    "uvicorn>=0.30,<1",
+    "x402[evm,httpx]==2.23.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "build>=1.2", "twine>=6"]
+
+[project.scripts]
+kite-x402-fastapi = "kite_x402_fastapi.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kite_x402_fastapi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
