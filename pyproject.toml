@@ -9,12 +9,30 @@ description = "Minimal FastAPI reverse proxy for x402 payments on Kite"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.115,<1",
     "httpx>=0.28.1,<0.29",
     "uvicorn>=0.30,<1",
     "x402[evm,httpx]==2.23.0",
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/Niri7981/kite-x402-fastapi"
+Repository = "https://github.com/Niri7981/kite-x402-fastapi"
+Issues = "https://github.com/Niri7981/kite-x402-fastapi/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "build>=1.2", "twine>=6"]

@@ -35,6 +35,18 @@
 
 默认 facilitator 是 `https://facilitator.pieverse.io/v2`。`/v2` 必须保留，因为 SDK 会继续追加 `/supported`、`/verify` 和 `/settle`。
 
+## PyPI 安装
+
+发行包名为 `kite-x402-fastapi`。项目目前尚未发布到 PyPI；发布后可使用：
+
+```bash
+python -m pip install kite-x402-fastapi
+```
+
+PyPI 页面：**发布完成后在此填写最终链接**。
+
+安装后配置所需环境变量（见下方“配置”），然后运行 `kite-x402-fastapi`。
+
 ## 运行示例
 
 需要 Python 3.10 或更高版本。以下示例使用 `uv`：
@@ -85,10 +97,14 @@ curl -i 'http://127.0.0.1:8080/v1/hello?name=Kite'
 
 ## 开发与发布检查
 
+在仓库根目录运行以下命令，可执行完整测试、构建 wheel 和 sdist、检查发行包元数据，并在干净虚拟环境中安装 wheel 后启动 CLI：
+
 ```bash
-uv run pytest -q
-uv build
-uv run twine check dist/*
+python -m pip install ".[dev]"
+python -m pytest -q
+python -m build
+python -m twine check dist/*
+python scripts/smoke_installed.py dist/*.whl
 ```
 
-包采用 `src/` 布局，入口命令是 `kite-x402-fastapi`，可作为 PyPI 包发布。当前版本不提交或推送任何 Git 变更。
+GitHub Actions 会在每次 push 和 pull request 时运行相同的测试和发行包检查。版本号在 `pyproject.toml` 中手动维护。
