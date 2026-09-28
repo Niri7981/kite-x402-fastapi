@@ -38,6 +38,7 @@ def main() -> None:
         scripts_dir = environment_dir / ("Scripts" if os.name == "nt" else "bin")
         python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
         cli = scripts_dir / ("kite-x402-fastapi.exe" if os.name == "nt" else "kite-x402-fastapi")
+        evaluator = scripts_dir / ("kite-x402-evaluate.exe" if os.name == "nt" else "kite-x402-evaluate")
 
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
@@ -68,6 +69,23 @@ def main() -> None:
             raise RuntimeError(f"package imported outside the clean environment: {module_path}")
         if not cli.is_file():
             raise RuntimeError(f"installed CLI was not created: {cli}")
+        if not evaluator.is_file():
+            raise RuntimeError(f"installed evaluator CLI was not created: {evaluator}")
+
+        evaluation = subprocess.run(
+            [str(evaluator), "--format", "json"],
+            cwd=workdir,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        report = json.loads(evaluation.stdout)
+        if report.get("summary", {}).get("status") != "passed" or not any(
+            case.get("id") == "replay_protection" and case.get("status") == "passed"
+            for case in report.get("cases", [])
+        ):
+            raise RuntimeError(f"installed evaluator reported a conformance failure: {report.get('summary')}")
 
         with socket.socket() as probe_socket:
             probe_socket.bind(("127.0.0.1", 0))
@@ -101,7 +119,7 @@ def main() -> None:
                     with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=1) as response:
                         payload = json.load(response)
                     if payload.get("ok") is True:
-                        print("Installed package import, CLI startup, and /healthz passed.")
+                        print("Installed package import, evaluator, CLI startup, and /healthz passed.")
                         return
                     raise RuntimeError(f"unexpected /healthz response: {payload}")
                 except (urllib.error.URLError, TimeoutError, OSError) as error:

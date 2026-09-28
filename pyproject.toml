@@ -39,6 +39,7 @@ dev = ["pytest>=8,<10", "build>=1.2", "twine>=6"]
 
 [project.scripts]
 kite-x402-fastapi = "kite_x402_fastapi.__main__:main"
+kite-x402-evaluate = "kite_x402_fastapi.evaluation:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kite_x402_fastapi"]

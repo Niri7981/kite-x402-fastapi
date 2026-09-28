@@ -1,5 +1,9 @@
 """Official x402 middleware plus a small HTTP reverse proxy."""
 
+import asyncio
+import base64
+import hashlib
+import json
 from contextlib import asynccontextmanager
 
 import httpx
@@ -19,6 +23,57 @@ HOP_BY_HOP = {
     "connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade",
     "host", "content-length", "proxy-authenticate", "proxy-authorization",
 }
+
+
+class _ReplayGuard:
+    """Process-local protection against resubmitting a settled payload."""
+
+    def __init__(self) -> None:
+        self._in_flight: set[str] = set()
+        self._settled: set[str] = set()
+        self._lock = asyncio.Lock()
+
+    async def claim(self, fingerprint: str) -> bool:
+        async with self._lock:
+            if fingerprint in self._in_flight or fingerprint in self._settled:
+                return False
+            self._in_flight.add(fingerprint)
+            return True
+
+    async def finish(self, fingerprint: str, settled: bool) -> None:
+        async with self._lock:
+            self._in_flight.discard(fingerprint)
+            if settled:
+                self._settled.add(fingerprint)
+
+
+def _settlement_succeeded(response: Response | None) -> bool:
+    if response is None:
+        return False
+    header = response.headers.get("payment-response")
+    if not header:
+        return False
+    try:
+        result = json.loads(base64.b64decode(header))
+    except (ValueError, json.JSONDecodeError):
+        return False
+    return isinstance(result, dict) and result.get("success") is True
+
+
+def _payment_fingerprint(payment: str) -> str:
+    try:
+        payload = json.loads(base64.b64decode(payment, validate=True))
+        if isinstance(payload, dict):
+            payment_data = payload.get("payload")
+            authorization = payment_data.get("authorization") if isinstance(payment_data, dict) else None
+            accepted = payload.get("accepted")
+            if isinstance(accepted, dict) and isinstance(authorization, dict):
+                # Resource URLs and JSON formatting do not distinguish an already-used authorization.
+                payload = {"accepted": accepted, "authorization": authorization}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    except (ValueError, json.JSONDecodeError):
+        canonical = payment.encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def create_app(
@@ -48,6 +103,27 @@ def create_app(
         )
     }
     payments = payment_middleware(routes, server)
+    replay_guard = _ReplayGuard()
+
+    async def protected_payments(request: Request, call_next):
+        payment = request.headers.get("payment-signature") or request.headers.get("x-payment")
+        if not payment or not request.scope["path"].startswith("/v1/"):
+            return await payments(request, call_next)
+
+        fingerprint = _payment_fingerprint(payment)
+        if not await replay_guard.claim(fingerprint):
+            return JSONResponse(
+                {"error": "payment payload has already been used"},
+                status_code=402,
+                headers={"X-Payment-Replay": "true", "Cache-Control": "no-store"},
+            )
+
+        response = None
+        try:
+            response = await payments(request, call_next)
+            return response
+        finally:
+            await replay_guard.finish(fingerprint, _settlement_succeeded(response))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -62,7 +138,7 @@ def create_app(
                 await facilitator.aclose()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.middleware("http")(payments)
+    app.middleware("http")(protected_payments)
 
     @app.get("/healthz")
     async def healthz():

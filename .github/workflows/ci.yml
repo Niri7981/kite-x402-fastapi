@@ -16,6 +16,7 @@ jobs:
         with:
           python-version: "3.10"
       - run: python -m pip install ".[dev]"
+      - run: kite-x402-evaluate
       - run: python -m pytest -q
       - run: python -m build
       - run: python -m twine check dist/*

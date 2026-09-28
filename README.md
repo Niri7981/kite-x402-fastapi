@@ -95,6 +95,27 @@ curl -i 'http://127.0.0.1:8080/v1/hello?name=Kite'
 
 `PRICE_USD` 必须是正的十进制数。主网最多六位小数；测试网最多十八位小数。
 
+## x402 一致性评估
+
+项目包含一个可复用的确定性评估器，用真实 x402 SDK 和 FastAPI 中间件检查付款挑战、拒绝路径、上游失败处理及结算顺序。facilitator 和上游请求都由脚本化 HTTP mock 响应，因此评估不会连接真实服务或提交真实付款。
+
+安装项目后运行文本报告或 JSON 报告：
+
+```bash
+kite-x402-evaluate
+kite-x402-evaluate --format json
+```
+
+也可以选择 Kite 网络、收款地址和挑战价格：
+
+```bash
+kite-x402-evaluate --network testnet --pay-to 0x1111111111111111111111111111111111111111 --price-usd 0.001
+```
+
+评估覆盖未付款、验证失败、成功付款、重复付款重放、上游 HTTP 错误、错误网络/资产/EIP-712 代币元数据、结算失败及上游无法连接。命令在全部检查通过时退出码为 `0`，有任何失败时退出码为 `1`。Python 调用方也可使用 `kite_x402_fastapi.evaluation.evaluate_service()`；自定义 `app_factory` 需要支持 `settings`、`facilitator` 和 `upstream_client` 参数。
+
+重放保护在应用进程内记录已成功结算付款的 payload 指纹，并拒绝重复提交。记录仅存在于内存中：进程重启后会清空，多 worker 之间也不会共享，并会随该进程成功结算的不同授权数量增长。因此它适合单进程部署的额外防护，不替代 facilitator 或链上 nonce 的跨进程防重放能力。
+
 ## 开发与发布检查
 
 在仓库根目录运行以下命令，可执行完整测试、构建 wheel 和 sdist、检查发行包元数据，并在干净虚拟环境中安装 wheel 后启动 CLI：
