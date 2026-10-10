@@ -99,12 +99,15 @@ curl -i 'http://127.0.0.1:8080/v1/hello?name=Kite'
 
 项目包含一个可复用的确定性评估器，用真实 x402 SDK 和 FastAPI 中间件检查付款挑战、拒绝路径、上游失败处理及结算顺序。facilitator 和上游请求都由脚本化 HTTP mock 响应，因此评估不会连接真实服务或提交真实付款。
 
-安装项目后运行文本报告或 JSON 报告：
+安装项目后运行文本、JSON 或 Markdown 报告：
 
 ```bash
 kite-x402-evaluate
 kite-x402-evaluate --format json
+kite-x402-evaluate --format markdown > evaluation-report.md
 ```
+
+Markdown 报告包含每个场景的名称、通过/失败状态、汇总及失败详情；相同评估结果会生成相同内容。CI 将报告上传为 `x402-evaluation-report` artifact。增量改进说明见 [Week 4：Markdown 评估报告](docs/week-4.md)。
 
 也可以选择 Kite 网络、收款地址和挑战价格：
 

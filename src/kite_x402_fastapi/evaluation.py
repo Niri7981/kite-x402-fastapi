@@ -251,6 +251,44 @@ class EvaluationReport:
     def to_json(self, *, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
 
+    def to_markdown(self) -> str:
+        """Render the structured results without timestamps or extra evaluation."""
+        def escape(value: str) -> str:
+            value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            for character in "\\`*_[]|":
+                value = value.replace(character, f"\\{character}")
+            return value.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
+
+        report = self.to_dict()
+        summary = report["summary"]
+        lines = [
+            "# x402 service evaluation",
+            "",
+            f"**{summary['status'].upper()}**: {summary['passed']}/{summary['total']} "
+            f"scenarios passed; {summary['failed']} failed.",
+            "",
+            f"- Network: {escape(report['network'])}",
+            f"- Asset: {escape(report['asset'])}",
+            f"- Price: {escape(report['price'])}",
+            "",
+            "| ID | Scenario | Status |",
+            "| --- | --- | --- |",
+        ]
+        for case in report["cases"]:
+            lines.append(f"| {escape(case['id'])} | {escape(case['name'])} | {case['status'].upper()} |")
+        for case in report["cases"]:
+            if case["status"] == "passed":
+                continue
+            lines.extend(["", f"## {escape(case['id'])}: {escape(case['name'])}", ""])
+            for check in case["checks"]:
+                if check["status"] == "failed":
+                    expected = escape(json.dumps(check["expected"], sort_keys=True))
+                    actual = escape(json.dumps(check["actual"], sort_keys=True))
+                    lines.append(f"- {escape(check['name'])}: expected {expected}, got {actual}.")
+            if case.get("error"):
+                lines.append(f"- Error: {escape(case['error'])}")
+        return "\n".join(lines)
+
     def to_text(self) -> str:
         summary = self.to_dict()["summary"]
         lines = [
@@ -441,7 +479,7 @@ def evaluate_service(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run deterministic x402 service conformance checks.")
-    parser.add_argument("--format", choices=("text", "json"), default="text", help="output format (default: text)")
+    parser.add_argument("--format", choices=("text", "json", "markdown"), default="text", help="output format (default: text)")
     parser.add_argument("--network", choices=("mainnet", "testnet"), default="mainnet", help="Kite challenge network")
     parser.add_argument("--pay-to", default=PAY_TO, help="pay-to address used in the generated challenge")
     parser.add_argument("--price-usd", default="0.001", help="price used in the generated challenge")
@@ -454,7 +492,12 @@ def main() -> None:
         price_usd=args.price_usd,
     )
     report = evaluate_service(settings=settings)
-    print(report.to_json() if args.format == "json" else report.to_text())
+    if args.format == "json":
+        print(report.to_json())
+    elif args.format == "markdown":
+        print(report.to_markdown())
+    else:
+        print(report.to_text())
     raise SystemExit(0 if report.passed else 1)
 
 
